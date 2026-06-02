@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { signup } from "../../services/auth.service";
+import { useAuth } from "../../context/auth.context";
 import useToast from "../../hooks/useToast";
 
 export default function SignupPage() {
@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { signup } = useAuth();
   const { addToast } = useToast();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

@@ -7,7 +7,14 @@ import {
   useEffect,
   useState,
 } from "react";
-import { getAuthToken, clearAuthToken, getProfile, updateProfile as apiUpdateProfile } from "../services/auth.service";
+import {
+  getAuthToken,
+  clearAuthToken,
+  getProfile,
+  updateProfile as apiUpdateProfile,
+  login as apiLogin,
+  signup as apiSignup,
+} from "../services/auth.service";
 
 interface User {
   id: string;
@@ -21,6 +28,8 @@ interface AuthContextType {
   isLoading: boolean;
   logout: () => void;
   updateProfile: (name: string, email: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<any>;
+  signup: (email: string, password: string) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -66,8 +75,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({ id: updatedUser.id, email: updatedUser.email, name: updatedUser.name || undefined });
   };
 
+  const login = async (email: string, password: string) => {
+    const data = await apiLogin(email, password);
+    const token = data.data?.token;
+    if (token) {
+      setToken(token);
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        setUser({ id: payload.userId, email: payload.email });
+        
+        try {
+          const freshUser = await getProfile();
+          setUser({ id: freshUser.id, email: freshUser.email, name: freshUser.name || undefined });
+        } catch (err) {
+          console.error("Failed to load fresh user profile", err);
+        }
+      } catch (error) {
+        console.error("Failed to parse token");
+      }
+    }
+    return data;
+  };
+
+  const signup = async (email: string, password: string) => {
+    const data = await apiSignup(email, password);
+    const token = data.data?.token;
+    if (token) {
+      setToken(token);
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        setUser({ id: payload.userId, email: payload.email });
+        
+        try {
+          const freshUser = await getProfile();
+          setUser({ id: freshUser.id, email: freshUser.email, name: freshUser.name || undefined });
+        } catch (err) {
+          console.error("Failed to load fresh user profile", err);
+        }
+      } catch (error) {
+        console.error("Failed to parse token");
+      }
+    }
+    return data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, token, isLoading, logout, updateProfile, login, signup }}>
       {children}
     </AuthContext.Provider>
   );
