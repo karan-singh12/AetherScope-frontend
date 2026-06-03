@@ -5,9 +5,48 @@ import { useSearchParams } from "next/navigation";
 import { useChat } from "../../hooks/useChat";
 import useToast from "../../hooks/useToast";
 
+const PROVIDER_MODELS: Record<string, { label: string; value: string }[]> = {
+  openai: [
+    { label: "GPT-4o Mini (Default)", value: "gpt-4.1" },
+    { label: "GPT-4o Mini (Explicit)", value: "gpt-4o-mini" },
+    { label: "GPT-3.5 Turbo", value: "gpt-3.5-turbo" },
+  ],
+  gemini: [
+    { label: "Gemini Flash (Latest)", value: "gemini-flash-latest" },
+    { label: "Gemini Pro (Latest)", value: "gemini-pro-latest" },
+    { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+    { label: "Gemini 2.0 Flash", value: "gemini-2.0-flash" },
+  ],
+  groq: [
+    { label: "Llama 3.1 8B (Default)", value: "llama-3.1-8b-instant" },
+    { label: "Llama 3.3 70B", value: "llama-3.3-70b-versatile" },
+  ],
+  mock: [
+    { label: "Mock Local LLM (Instant)", value: "mock-model" },
+  ],
+};
+
+const PROVIDERS = [
+  { label: "Gemini (Google)", value: "gemini" },
+  { label: "Groq (Llama3/Mixtral)", value: "groq" },
+  { label: "Mock Local Model", value: "mock" },
+  { label: "OpenAI", value: "openai" },
+];
+
 function ChatContent() {
-  const { currentConversation, messages, send, startNew, loadConversation, isLoading } =
-    useChat();
+  const {
+    currentConversation,
+    messages,
+    send,
+    startNew,
+    loadConversation,
+    isLoading,
+    selectedProvider,
+    selectedModel,
+    currentProvider,
+    currentModel,
+    setProviderAndModel,
+  } = useChat();
   const searchParams = useSearchParams();
   const convId = searchParams.get("id");
   const toast = useToast((state) => state.addToast);
@@ -55,12 +94,74 @@ function ChatContent() {
         </button>
       </div>
 
+      {/* Model & Endpoint Settings Bar */}
+      <div className="rounded-3xl border border-slate-200/60 bg-white p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition duration-200 hover:shadow-md">
+        <div className="flex flex-wrap items-center gap-4 flex-1">
+          {/* Provider Selector */}
+          <div className="flex flex-col gap-1.5 min-w-[180px]">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">LLM Provider</span>
+            <select
+              value={selectedProvider}
+              onChange={(e) => {
+                const prov = e.target.value;
+                const defModel = PROVIDER_MODELS[prov][0].value;
+                setProviderAndModel(prov, defModel);
+              }}
+              disabled={!!currentConversation}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {PROVIDERS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Model Selector */}
+          <div className="flex flex-col gap-1.5 min-w-[200px]">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Model Endpoint</span>
+            <select
+              value={selectedModel}
+              onChange={(e) => {
+                setProviderAndModel(selectedProvider, e.target.value);
+              }}
+              disabled={!!currentConversation}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {PROVIDER_MODELS[selectedProvider]?.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {currentConversation ? (
+          <div className="flex flex-col gap-1 justify-end text-left md:text-right">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Configuration</span>
+            <span className="text-sm font-semibold text-slate-850 flex items-center gap-1.5 md:justify-end">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              {currentProvider.toUpperCase()} — {currentModel}
+            </span>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1 justify-end text-left md:text-right md:max-w-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Configuration Status</span>
+            <span className="text-xs font-medium text-slate-500">
+              Select provider &amp; model before starting the conversation. Locked once active.
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* Main Console Frame */}
       <div className="flex-1 rounded-3xl border border-slate-200/60 bg-slate-50/50 p-4 shadow-inner flex flex-col justify-between">
         {/* Session details tag */}
         <div className="mb-3 flex items-center justify-between gap-4 text-xs font-semibold text-slate-500 px-1">
           <span className="flex items-center gap-1.5 font-mono">
-            <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulseSlow"></span>
+            <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse"></span>
             Session ID: {currentConversation ? currentConversation.slice(0, 15) + "..." : "none (will auto-create)"}
           </span>
           <span className="bg-slate-200/60 rounded-md px-2 py-0.5">{messages.length} messages</span>
@@ -103,7 +204,7 @@ function ChatContent() {
                   </span>
                   <span
                     className={`text-[9px] font-medium ${
-                      message.role === "assistant" ? "text-slate-500" : "text-slate-400"
+                      message.role === "assistant" ? "text-slate-400" : "text-slate-400"
                     }`}
                   >
                     {new Date(message.createdAt).toLocaleTimeString()}

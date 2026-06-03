@@ -5,8 +5,8 @@ export const sendMessage = async (conversationId: string, prompt: string) => {
   return res.data.data;
 };
 
-export const createConversation = async () => {
-  const res = await api.post('/api/conversations');
+export const createConversation = async (provider?: string, model?: string) => {
+  const res = await api.post('/api/conversations', { provider, model });
   return res.data.data;
 };
 

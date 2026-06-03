@@ -1,5 +1,5 @@
 "use client";
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { create } from 'zustand';
 import { Message } from '../types';
 import * as chatService from '../services/chat.service';
@@ -9,9 +9,14 @@ interface ChatState {
   currentConversation: string | null;
   messages: Message[];
   isLoading: boolean;
+  selectedProvider: string;
+  selectedModel: string;
+  currentProvider: string;
+  currentModel: string;
+  setProviderAndModel: (provider: string, model: string) => void;
   setConversation: (id: string) => void;
   send: (prompt: string) => Promise<void>;
-  startNew: () => Promise<void>;
+  startNew: (provider?: string, model?: string) => Promise<void>;
   loadConversation: (id: string) => Promise<void>;
 }
 
@@ -40,16 +45,30 @@ export const useChat = create<ChatState>((set, get) => ({
   currentConversation: null,
   messages: [],
   isLoading: false,
+  selectedProvider: 'gemini',
+  selectedModel: 'gemini-flash-latest',
+  currentProvider: 'gemini',
+  currentModel: 'gemini-flash-latest',
+
+  setProviderAndModel: (provider: string, model: string) => {
+    set({ selectedProvider: provider, selectedModel: model });
+  },
+
   setConversation: (id: string) => set({ currentConversation: id }),
+
   send: async (prompt: string) => {
     const state = get();
     set({ isLoading: true });
     try {
       let convId = state.currentConversation;
       if (!convId) {
-        const conv = await chatService.createConversation();
+        const conv = await chatService.createConversation(state.selectedProvider, state.selectedModel);
         convId = conv.id;
-        set({ currentConversation: convId });
+        set({
+          currentConversation: convId,
+          currentProvider: conv.provider,
+          currentModel: conv.model,
+        });
         toast('success', 'Created a new conversation.');
       }
 
@@ -73,21 +92,40 @@ export const useChat = create<ChatState>((set, get) => ({
       set({ isLoading: false });
     }
   },
-  startNew: async () => {
+
+  startNew: async (provider?: string, model?: string) => {
     try {
-      const conv = await chatService.createConversation();
-      set({ currentConversation: conv.id, messages: [], isLoading: false });
+      const activeProvider = provider ?? get().selectedProvider;
+      const activeModel = model ?? get().selectedModel;
+      const conv = await chatService.createConversation(activeProvider, activeModel);
+      set({
+        currentConversation: conv.id,
+        messages: [],
+        isLoading: false,
+        currentProvider: conv.provider,
+        currentModel: conv.model,
+        selectedProvider: conv.provider,
+        selectedModel: conv.model,
+      });
       toast('success', 'Started a new conversation.');
     } catch (error: unknown) {
       const message = getApiErrorMessage(error);
       toast('error', `Could not start a new conversation: ${message}`);
     }
   },
+
   loadConversation: async (id: string) => {
     set({ isLoading: true });
     try {
       const data = await chatService.getConversation(id);
-      set({ currentConversation: id, messages: data?.messages ?? [] });
+      set({
+        currentConversation: id,
+        messages: data?.messages ?? [],
+        currentProvider: data?.provider ?? 'openai',
+        currentModel: data?.model ?? 'gpt-4.1',
+        selectedProvider: data?.provider ?? 'openai',
+        selectedModel: data?.model ?? 'gpt-4.1',
+      });
     } catch (error: unknown) {
       const message = getApiErrorMessage(error);
       toast('error', `Could not load conversation: ${message}`);
@@ -98,7 +136,5 @@ export const useChat = create<ChatState>((set, get) => ({
 }));
 
 export const useChatState = useChat;
-
 export const useChatHook = () => useChat();
-
 export default useChat;
