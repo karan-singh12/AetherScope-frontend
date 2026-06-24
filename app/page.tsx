@@ -1,4 +1,8 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import api from "../services/api";
 
 const cards = [
   {
@@ -48,14 +52,71 @@ const cards = [
 ];
 
 export default function Home() {
+  const [status, setStatus] = useState<"connecting" | "online" | "error">("connecting");
+
+  useEffect(() => {
+    let isActive = true;
+    let retryCount = 0;
+    const maxRetries = 10;
+    const retryDelay = 3000;
+
+    const pingBackend = async () => {
+      try {
+        await api.get("/api/health");
+        if (isActive) {
+          setStatus("online");
+        }
+      } catch (error) {
+        console.error("Backend health check failed, retrying...", error);
+        if (isActive) {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(pingBackend, retryDelay);
+          } else {
+            setStatus("error");
+          }
+        }
+      }
+    };
+
+    pingBackend();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-12 py-4 animate-fadeIn">
       <section className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
         <div className="space-y-6">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white tracking-wider uppercase select-none">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
-            Observability Suite
-          </span>
+          <div className="flex flex-wrap gap-2.5 items-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white tracking-wider uppercase select-none">
+              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+              Observability Suite
+            </span>
+            
+            {status === "connecting" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200/60 px-3 py-1 text-xs font-semibold text-amber-700 tracking-wider uppercase select-none animate-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                Waking up server...
+              </span>
+            )}
+            
+            {status === "online" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200/60 px-3 py-1 text-xs font-semibold text-emerald-700 tracking-wider uppercase select-none">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                System Online
+              </span>
+            )}
+            
+            {status === "error" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 border border-rose-200/60 px-3 py-1 text-xs font-semibold text-rose-750 tracking-wider uppercase select-none">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                System Offline
+              </span>
+            )}
+          </div>
           <h1 className="text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl leading-[1.15]">
             Track prompts, costs, and model metrics in real time.
           </h1>
